@@ -84,7 +84,7 @@ public class GoogleTokenServicesTest {
     }
 
     @Test
-    public void shouldLoadAuthenticationAndTransformValuesToStandardValuesAndAddBGCHRole() throws Exception {
+    public void shouldLoadAuthenticationAndTransformValuesToStandardValuesAndAddDomainRole() throws Exception {
         Map<String, String> body = new HashMap<>();
         body.put("issued_to", "blh");
         body.put("user_id", "user@domain.google.com");
