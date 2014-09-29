@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<b:beans xmlns:sec="http://www.springframework.org/schema/security"
+         xmlns:b="http://www.springframework.org/schema/beans"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.0.xsd
+                        http://www.springframework.org/schema/security http://www.springframework.org/schema/security/spring-security.xsd">
+    <sec:http use-expressions="true" entry-point-ref="clientAuthenticationEntryPoint">
+        <sec:http-basic/>
+        <sec:logout/>
+        <sec:anonymous enabled="false"/>
+
+        <sec:intercept-url pattern="/**" access="isFullyAuthenticated()"/>
+
+        <!-- This is the crucial part and the wiring is very important -->
+        <!-- 
+            The order in which these filters execute are very important. oauth2ClientContextFilter must be invoked before 
+            oAuth2AuthenticationProcessingFilter, that's because when a redirect to Google is required, oAuth2AuthenticationProcessingFilter 
+            throws a UserRedirectException which the oauth2ClientContextFilter handles and generates a redirect request to Google.
+            Subsequently the response from Google is handled by the oAuth2AuthenticationProcessingFilter to populate the 
+            Authentication object and stored in the SecurityContext
+        -->
+        <sec:custom-filter ref="oauth2ClientContextFilter" after="EXCEPTION_TRANSLATION_FILTER"/>
+        <sec:custom-filter ref="oAuth2AuthenticationProcessingFilter" before="FILTER_SECURITY_INTERCEPTOR"/>
+    </sec:http>
+
+    <b:bean id="oAuth2AuthenticationProcessingFilter" class="org.springframework.security.oauth2.client.filter.OAuth2ClientAuthenticationProcessingFilter">
+        <b:constructor-arg name="defaultFilterProcessesUrl" value="/googleLogin"/>
+        <b:property name="restTemplate" ref="googleRestTemplate"/>
+        <b:property name="tokenServices" ref="tokenServices"/>
+    </b:bean>
+
+    <!--
+        These token classes are mostly a clone of the Spring classes but have the structure modified so that the response
+        from Google can be handled.
+    -->
+    <b:bean id="tokenServices" class="com.rst.oauth2.google.security.GoogleTokenServices">
+        <b:property name="checkTokenEndpointUrl" value="https://www.googleapis.com/oauth2/v1/tokeninfo"/>
+        <b:property name="clientId" value="${google.client.id}"/>
+        <b:property name="clientSecret" value="${google.client.secret}"/>
+        <b:property name="accessTokenConverter">
+            <b:bean class="com.rst.oauth2.google.security.GoogleAccessTokenConverter">
+                <b:property name="userTokenConverter">
+                    <b:bean class="com.rst.oauth2.google.security.DefaultUserAuthenticationConverter"/>
+                </b:property>
+            </b:bean>
+        </b:property>
+    </b:bean>
+
+    <!-- 
+        This authentication entry point is used for all the unauthenticated or unauthorised sessions to be directed to the 
+        /googleLogin URL which is then intercepted by the oAuth2AuthenticationProcessingFilter to trigger authentication from 
+        Google.
+    -->
+    <b:bean id="clientAuthenticationEntryPoint" class="org.springframework.security.web.authentication.LoginUrlAuthenticationEntryPoint">
+        <b:property name="loginFormUrl" value="/googleLogin"/>
+    </b:bean>
+
+    <sec:authentication-manager alias="alternateAuthenticationManager">
+        <sec:authentication-provider>
+            <sec:user-service>
+                <sec:user name="user" password="password" authorities="DOMAIN_USER"/>
+            </sec:user-service>
+        </sec:authentication-provider>
+    </sec:authentication-manager>
+</b:beans>

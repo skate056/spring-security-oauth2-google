@@ -1,0 +1,67 @@
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+
+    dependencies {
+        classpath("org.springframework.boot:spring-boot-gradle-plugin:1.1.5.RELEASE")
+    }
+}
+
+repositories {
+    mavenCentral()
+}
+
+apply plugin: 'java'
+apply plugin: 'idea'
+apply plugin: 'spring-boot'
+apply plugin: 'war'
+
+version = '1.0'
+sourceCompatibility = 1.7
+targetCompatibility = 1.7
+
+dependencies {
+    // Spring Boot
+    compile("org.springframework.boot:spring-boot-autoconfigure") {
+        exclude module: 'spring-boot-starter-logging'
+    }
+    compile("org.springframework.boot:spring-boot-starter-web") {
+        exclude module: 'spring-boot-starter-logging'
+    }
+    compile("org.springframework.boot:spring-boot-starter-jetty") {
+        exclude module: 'spring-boot-starter-logging'
+    }
+    compile("org.springframework.boot:spring-boot-starter-actuator") {
+        exclude module: 'spring-boot-starter-logging'
+    }
+
+    // Database - Cassandra via Spring Data
+    compile('org.springframework.data:spring-data-cassandra:1.0.4.RELEASE') {
+        exclude module: 'junit'
+        exclude module: 'log4j'
+    }
+
+    // web
+    compile 'javax.servlet.jsp.jstl:javax.servlet.jsp.jstl-api:1.2.1'
+    compile 'org.apache.taglibs:taglibs-standard-jstlel:1.2.1'
+
+    // security
+    compile 'org.springframework.security:spring-security-web:3.2.5.RELEASE'
+    compile 'org.springframework.security:spring-security-config:3.2.5.RELEASE'
+    compile 'org.springframework.security.oauth:spring-security-oauth2:2.0.3.RELEASE'
+
+    // Logging
+    compile group: 'org.slf4j', name: 'slf4j-api', version: '1.7.+'
+    compile group: 'ch.qos.logback', name: 'logback-classic', version: '1.+'
+
+    // utilities
+    compile("joda-time:joda-time:2.1")
+
+    // Test dependencies
+    testCompile("org.springframework.boot:spring-boot-starter-test")
+    testCompile group: 'org.hamcrest', name: 'hamcrest-library', version: '1.3'
+    testCompile('junit:junit:4.11')
+    testCompile("nl.jqno.equalsverifier:equalsverifier:1.5")
+    testCompile("io.generators:generators-core:1.0")
+}

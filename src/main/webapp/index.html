@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Basic HTML Page</title>
+    <style>
+        svg {
+            background-color: #f0f0f0;
+        }
+
+        #inputparameters {
+            margin: 20px;
+        }
+    </style>
+
+    <script src="libs/jquery-2.1.0.min.js"></script>
+    <script>
+        $(function() {
+            function log( message ) {
+                $( "<div>" ).text( message ).prependTo( "#log" );
+                $( "#log" ).scrollTop( 0 );
+            }
+
+            $( "#username" ).autocomplete({
+                source: "/find",
+                minLength: 3,
+                select: function( event, ui ) {
+                    log( ui.item ?
+                            "Selected: " + ui.item.value + " aka " + ui.item.id :
+                            "Nothing selected, input was " + this.value );
+                }
+            });
+        });
+    </script>
+</head>
+<body>
+<div id="chart"></div>
+<div id="preview"></div>
+<h1>OAuth2 Test Page</h1>
+
+<div id="inputparameters">
+
+    <form id="inputparams">
+        <label for="username">Username</label>
+        <input id="username" name="username" type="email" value="blah@blah.com" required/>
+
+        <label for="start_ts">Start Time</label>
+        <input id="start_ts" name="start_ts" type="text" required/>
+
+        <label for="end_ts">End Time</label>
+        <input id="end_ts" name="end_ts" type="text" required/>
+    </form>
+</div>
+</body>
+</html>
+
