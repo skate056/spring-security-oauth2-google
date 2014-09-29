@@ -13,45 +13,48 @@
 
 package com.rst.oauth2.google.security;
 
+import static com.google.common.collect.Lists.newArrayList;
+import static org.springframework.security.core.authority.AuthorityUtils.commaSeparatedStringToAuthorityList;
+import static org.springframework.util.StringUtils.arrayToCommaDelimitedString;
+import static org.springframework.util.StringUtils.collectionToCommaDelimitedString;
+
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.AuthorityUtils;
-import org.springframework.security.oauth2.provider.token.UserAuthenticationConverter;
-import org.springframework.util.StringUtils;
 
 import java.util.Collection;
-import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
  * Copied from the original implementation of the <code>DefaultUserAuthenticationConverter</code> to fix a bug in the
- * <code>getAuthorities</code> method. Rest all unchanged. Refer to
- * https://github.com/spring-projects/spring-security-oauth/blob/6d9de66787cb60249f0de00ffe9075366a803924/spring-security-oauth2/src/main/java/org/springframework/security/oauth2/provider/token/DefaultUserAuthenticationConverter.java
+ * <code>getAuthorities</code> method. Rest all unchanged. Class with the original bug
+ * <code>org.springframework.security.oauth2.provider.token.DefaultUserAuthenticationConverter</code>
  */
-public class DefaultUserAuthenticationConverter implements UserAuthenticationConverter {
+public class DefaultUserAuthenticationConverter extends org.springframework.security.oauth2.provider.token.DefaultUserAuthenticationConverter {
 
     private Collection<? extends GrantedAuthority> defaultAuthorities;
 
+    private AuthorityGranter authorityGranter;
+
     /**
      * Default value for authorities if an Authentication is being created and the input has no data for authorities.
-     * Note that unless this property is set, the default Authentication created by {@link #extractAuthentication(Map)}
+     * Note that unless this property is set, the default Authentication created by {@link #extractAuthentication(java.util.Map)}
      * will be unauthenticated.
      *
      * @param defaultAuthorities the defaultAuthorities to set. Default null.
      */
     public void setDefaultAuthorities(String[] defaultAuthorities) {
-        this.defaultAuthorities = AuthorityUtils.commaSeparatedStringToAuthorityList(StringUtils
-                .arrayToCommaDelimitedString(defaultAuthorities));
+        this.defaultAuthorities = commaSeparatedStringToAuthorityList(arrayToCommaDelimitedString(defaultAuthorities));
     }
 
-    public Map<String, ?> convertUserAuthentication(Authentication authentication) {
-        Map<String, Object> response = new LinkedHashMap<String, Object>();
-        response.put(USERNAME, authentication.getName());
-        if (authentication.getAuthorities() != null && !authentication.getAuthorities().isEmpty()) {
-            response.put(AUTHORITIES, AuthorityUtils.authorityListToSet(authentication.getAuthorities()));
-        }
-        return response;
+    /**
+     * Authority granter which can grant additional authority to the user based on custom rules.
+     *
+     * @param authorityGranter
+     */
+    public void setAuthorityGranter(AuthorityGranter authorityGranter) {
+        this.authorityGranter = authorityGranter;
     }
 
     public Authentication extractAuthentication(Map<String, ?> map) {
@@ -62,18 +65,44 @@ public class DefaultUserAuthenticationConverter implements UserAuthenticationCon
     }
 
     private Collection<? extends GrantedAuthority> getAuthorities(Map<String, ?> map) {
+        List<GrantedAuthority> authorityList = newArrayList();
         if (!map.containsKey(AUTHORITIES)) {
-            return defaultAuthorities;
+            assignDefaultAuthorities(authorityList);
+        } else {
+            grantAuthoritiesBasedOnValuesInMap(map, authorityList);
         }
+        grantAdditionalAuthorities(map, authorityList);
+        return authorityList;
+    }
+
+    private void grantAuthoritiesBasedOnValuesInMap(Map<String, ?> map, List<GrantedAuthority> authorityList) {
+        List<GrantedAuthority> parsedAuthorities = parseAuthorities(map);
+        authorityList.addAll(parsedAuthorities);
+    }
+
+    private void grantAdditionalAuthorities(Map<String, ?> map, List<GrantedAuthority> authorityList) {
+        if (authorityGranter != null) {
+            authorityList.addAll(authorityGranter.getAuthorities(map));
+        }
+    }
+
+    private void assignDefaultAuthorities(List<GrantedAuthority> authorityList) {
+        if (defaultAuthorities != null) {
+            authorityList.addAll(defaultAuthorities);
+        }
+    }
+
+    private List<GrantedAuthority> parseAuthorities(Map<String, ?> map) {
         Object authorities = map.get(AUTHORITIES);
+        List<GrantedAuthority> parsedAuthorities;
         if (authorities instanceof String) {
-            // Bug in Spring OAuth codebase - Does not return in this case and leads to an IllegalArgumentException
-            return AuthorityUtils.commaSeparatedStringToAuthorityList((String) authorities);
+            // Bugfix for Spring OAuth codebase
+            parsedAuthorities = commaSeparatedStringToAuthorityList((String) authorities);
+        } else if (authorities instanceof Collection) {
+            parsedAuthorities = commaSeparatedStringToAuthorityList(collectionToCommaDelimitedString((Collection<?>) authorities));
+        } else {
+            throw new IllegalArgumentException("Authorities must be either a String or a Collection");
         }
-        if (authorities instanceof Collection) {
-            return AuthorityUtils.commaSeparatedStringToAuthorityList(StringUtils
-                    .collectionToCommaDelimitedString((Collection<?>) authorities));
-        }
-        throw new IllegalArgumentException("Authorities must be either a String or a Collection");
+        return parsedAuthorities;
     }
 }

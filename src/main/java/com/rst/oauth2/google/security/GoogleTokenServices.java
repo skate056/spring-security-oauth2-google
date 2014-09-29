@@ -14,6 +14,7 @@ package com.rst.oauth2.google.security;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -21,7 +22,6 @@ import org.springframework.http.MediaType;
 import org.springframework.http.client.ClientHttpResponse;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.crypto.codec.Base64;
-import org.springframework.security.oauth2.common.OAuth2AccessToken;
 import org.springframework.security.oauth2.common.exceptions.InvalidTokenException;
 import org.springframework.security.oauth2.provider.OAuth2Authentication;
 import org.springframework.security.oauth2.provider.token.AccessTokenConverter;
@@ -89,67 +89,49 @@ public class GoogleTokenServices extends RemoteTokenServices {
 
     @Override
     public OAuth2Authentication loadAuthentication(String accessToken) throws AuthenticationException, InvalidTokenException {
-        Map<String, Object> map = new TokenRequest(accessToken).checkToken();
+        Map<String, Object> checkTokenResponse = checkToken(accessToken);
 
-        LOGGER.info("map1 = {}", map);
-        map.put("client_id", map.get("issued_to"));
-        map.put("user_name", map.get("user_id"));
-        map.put("authorities", "DOMAIN_USER,REGISTERED_USER");
-        LOGGER.info("map2 = {}", map);
+        if (checkTokenResponse.containsKey("error")) {
+            logger.debug("check_token returned error: " + checkTokenResponse.get("error"));
+            throw new InvalidTokenException(accessToken);
+        }
 
-        Assert.state(map.containsKey("client_id"), "Client id must be present in response from auth server");
-        return tokenConverter.extractAuthentication(map);
+        transformNonStandardValuesToStandardValues(checkTokenResponse);
+
+        Assert.state(checkTokenResponse.containsKey("client_id"), "Client id must be present in response from auth server");
+        return tokenConverter.extractAuthentication(checkTokenResponse);
     }
 
-    @Override
-    public OAuth2AccessToken readAccessToken(String accessToken) {
-        throw new UnsupportedOperationException("Not supported: read access token");
+    private Map<String, Object> checkToken(String accessToken) {
+        MultiValueMap<String, String> formData = new LinkedMultiValueMap<>();
+        formData.add("token", accessToken);
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", getAuthorizationHeader(clientId, clientSecret));
+        String accessTokenUrl = new StringBuilder(checkTokenEndpointUrl).append("?access_token=").append(accessToken).toString();
+        return postForMap(accessTokenUrl, formData, headers);
     }
 
+    private void transformNonStandardValuesToStandardValues(Map<String, Object> map) {
+        LOGGER.debug("Original map = " + map);
+        map.put("client_id", map.get("issued_to")); // Google sends 'client_id' as 'issued_to'
+        map.put("user_name", map.get("user_id")); // Google sends 'user_name' as 'user_id'
+        LOGGER.debug("Transformed = " + map);
+    }
+
+    private String getAuthorizationHeader(String clientId, String clientSecret) {
+        String creds = String.format("%s:%s", clientId, clientSecret);
+        try {
+            return "Basic " + new String(Base64.encode(creds.getBytes("UTF-8")));
+        } catch (UnsupportedEncodingException e) {
+            throw new IllegalStateException("Could not convert String");
+        }
+    }
 
     private Map<String, Object> postForMap(String path, MultiValueMap<String, String> formData, HttpHeaders headers) {
         if (headers.getContentType() == null) {
             headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
         }
-        return restTemplate.exchange(path, HttpMethod.POST, new HttpEntity<>(formData, headers), Map.class).getBody();
-    }
-
-    private class TokenRequest {
-        private String accessToken;
-        private MultiValueMap<String, String> formData;
-        private HttpHeaders headers;
-        private String accessTokenInUrl;
-
-        public TokenRequest(String accessToken) {
-            this.accessToken = accessToken;
-        }
-
-        private TokenRequest prepare() {
-            formData = new LinkedMultiValueMap<>();
-            formData.add("token", accessToken);
-            headers = new HttpHeaders();
-            headers.set("Authorization", getAuthorizationHeader(clientId, clientSecret));
-            accessTokenInUrl = "?access_token=" + accessToken;
-            return this;
-        }
-
-        private String getAuthorizationHeader(String clientId, String clientSecret) {
-            String creds = String.format("%s:%s", clientId, clientSecret);
-            try {
-                return "Basic " + new String(Base64.encode(creds.getBytes("UTF-8")));
-            } catch (UnsupportedEncodingException e) {
-                throw new IllegalStateException("Could not convert String");
-            }
-        }
-
-        private Map<String, Object> checkToken() {
-            prepare();
-            Map<String, Object> map = postForMap(checkTokenEndpointUrl + accessTokenInUrl, formData, headers);
-            if (map.containsKey("error")) {
-                logger.debug("check_token returned error: " + map.get("error"));
-                throw new InvalidTokenException(accessToken);
-            }
-            return map;
-        }
+        ParameterizedTypeReference<Map<String, Object>> map = new ParameterizedTypeReference<Map<String, Object>>() {};
+        return restTemplate.exchange(path, HttpMethod.POST, new HttpEntity<>(formData, headers), map).getBody();
     }
 }
