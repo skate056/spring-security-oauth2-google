@@ -30,6 +30,8 @@ import java.util.Map;
  * Copied from the original implementation of the <code>DefaultUserAuthenticationConverter</code> to fix a bug in the
  * <code>getAuthorities</code> method. Rest all unchanged. Class with the original bug
  * <code>org.springframework.security.oauth2.provider.token.DefaultUserAuthenticationConverter</code>
+ *
+ * @author Dave Syer
  */
 public class DefaultUserAuthenticationConverter extends org.springframework.security.oauth2.provider.token.DefaultUserAuthenticationConverter {
 
