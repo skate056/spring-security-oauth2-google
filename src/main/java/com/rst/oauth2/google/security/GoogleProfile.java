@@ -12,7 +12,9 @@ public class GoogleProfile {
     private String givenName;
     @JsonProperty("family_name")
     private String familyName;
+    private String link;
     private String picture;
+    private String gender;
     private String locale;
     private String hd;
 
@@ -40,8 +42,16 @@ public class GoogleProfile {
         return familyName;
     }
 
+    public String getLink() {
+        return link;
+    }
+
     public String getPicture() {
         return picture;
+    }
+
+    public String getGender() {
+        return gender;
     }
 
     public String getLocale() {
