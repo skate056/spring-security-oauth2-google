@@ -38,7 +38,7 @@ import java.io.UnsupportedEncodingException;
 import java.util.Map;
 
 /**
- * Copied from Spring Security OAuth2 to support the custom format for a Google Token which is different from what Spring supports
+ * Copied the RemoteTokenServices and modified for Google token details.
  */
 public class GoogleTokenServices extends RemoteTokenServices {
 
